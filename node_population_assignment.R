@@ -43,10 +43,5 @@ population_sf <- block_groups_sf %>%
   dplyr::mutate(area = sf::st_area(geometry), density = population / area)
 
 # Distribute Population to Nodes ------------------------------------------
-nodes <- dodgr::dodgr_vertices(graph) %>% 
-  dplyr::filter(id %in% rownames(distances)) %>% 
-  sf::st_as_sf(coords = c("x", "y"), crs = sf::st_crs(population_sf))
 
-covers <- sf::st_covers(population_sf, nodes)
-
-
+nodes <- get_nodes_with_populations(graph, population_sf, distances)
