@@ -15,22 +15,22 @@ trim_disconnected_nodes <- function(distances) {
   distances
 }
 
-get_nodes_with_populations <- function(graph, population_sf, distances) {
+get_nodes_with_census_data <- function(graph, census_data_sf, distances) {
   nodes <- dodgr::dodgr_vertices(graph) %>% 
     dplyr::filter(id %in% rownames(distances)) %>% 
-    sf::st_as_sf(coords = c("x", "y"), crs = sf::st_crs(population_sf))
+    sf::st_as_sf(coords = c("x", "y"), crs = sf::st_crs(census_data_sf))
   
-  covers <- sf::st_covers(population_sf, nodes)
-  names(covers) <- population_sf$GEOID
+  covers <- sf::st_covers(census_data_sf, nodes)
+  names(covers) <- census_data_sf$GEOID
   
   nodes_in_polygon <- purrr::map_df(covers, length) %>% 
     tidyr::gather("GEOID", "num_nodes")
     
-  covered_by <- sf::st_covered_by(nodes, population_sf) %>% 
+  covered_by <- sf::st_covered_by(nodes, census_data_sf) %>% 
     tibble::as_tibble() %>% 
-    dplyr::transmute(id = nodes$id, GEOID = population_sf$GEOID[col.id])
+    dplyr::transmute(id = nodes$id, GEOID = census_data_sf$GEOID[col.id])
   
-  population_flat <- tibble::as_tibble(population_sf) %>% 
+  population_flat <- tibble::as_tibble(census_data_sf) %>% 
     dplyr::select(-geometry)
   
   nodes %>% 
