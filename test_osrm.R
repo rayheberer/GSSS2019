@@ -9,8 +9,9 @@ osm_tags <- c("motorway", "trunk", "primary", "secondary", "tertiary")
 
 # Import OSM Data ---------------------------------------------------------
 
-query <- osmdata::opq(bbox = city) %>% 
-  osmdata::add_osm_feature(key = "highway", value = osm_tags)
+data_raw <- osmdata::opq(bbox = city) %>% 
+  osmdata::add_osm_feature(key = "highway", value = osm_tags) %>% 
+  osmdata::osmdata_sf()
 
 data_raw <- osmdata::osmdata_sf(query)
 
