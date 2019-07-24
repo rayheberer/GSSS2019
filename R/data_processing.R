@@ -15,7 +15,7 @@ trim_disconnected_nodes <- function(distances) {
   distances
 }
 
-get_nodes_with_census_data <- function(graph, census_data_sf, distances) {
+join_nodes_with_census_data <- function(graph, distances, census_data_sf) {
   nodes <- dodgr::dodgr_vertices(graph) %>% 
     dplyr::filter(id %in% rownames(distances)) %>% 
     sf::st_as_sf(coords = c("x", "y"), crs = sf::st_crs(census_data_sf))
@@ -39,7 +39,7 @@ get_nodes_with_census_data <- function(graph, census_data_sf, distances) {
     dplyr::left_join(data.frame(population_flat), by = "GEOID")
 }
 
-get_charging_stations <- function(state) {
+get_charging_stations <- function(state, crs = 4326) {
   api_key <- Sys.getenv("NREL_API_KEY")
   url <- "https://developer.nrel.gov/api/alt-fuel-stations/v1.json?"
   
@@ -54,5 +54,48 @@ get_charging_stations <- function(state) {
     purrr::map_dbl("latitude")
   
   data.frame(x = longitudes, y = latitudes) %>% 
-    sf::st_as_sf(coords = c("x", "y"), crs = 4326)
+    sf::st_as_sf(coords = c("x", "y"), crs = crs)
+}
+
+import_join_population_income_data <- function(state, county, save_path = tempdir()) {
+  totalcensus::set_path_to_census(save_path)
+  
+  population <- 
+    totalcensus::read_decennial(
+      year = 2010, 
+      states = state, 
+      summary_level = "block group", 
+    ) %>% 
+    dplyr::mutate(GEOID = stringr::str_sub(GEOID, 8L)) %>% 
+    dplyr::select(GEOID, population)
+  
+  income <- tidycensus::get_acs("tract", "B19013_001", state = state, county = county) %>% 
+    dplyr::select(GEOID, income = estimate, income_moe = moe)
+  
+  tracts_sf <- tigris::tracts(state, county) %>% 
+    sf::st_as_sf()
+  
+  block_groups_sf <- tigris::block_groups(state, county) %>% 
+    sf::st_as_sf()
+  
+  income_tracts <- tracts_sf %>% 
+    dplyr::left_join(income, by = "GEOID") %>% 
+    tibble::as_tibble() %>% 
+    dplyr::select(-geometry, -GEOID)
+  
+  block_groups_sf %>% 
+    dplyr::left_join(population, by = "GEOID") %>% 
+    dplyr::left_join(income_tracts, by = "TRACTCE") %>% 
+    dplyr::select(GEOID, population, income, income_moe) %>% 
+    dplyr::mutate(area = sf::st_area(geometry), density = population / area)
+}
+
+assign_stations_nearest_nodes <- function(nodes_sf, stations_sf,
+                                          node_id_col = "id") {
+  
+  station_nodes_dists <- sf::st_distance(stations_sf, nodes_census_sf)
+  
+  station_rows <- apply(station_nodes_dists, 1, which.min)
+  
+  nodes_sf[[node_id_col]][station_rows]
 }

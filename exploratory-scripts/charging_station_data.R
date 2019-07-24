@@ -1,30 +1,41 @@
-api_key <- Sys.getenv("NREL_API_KEY")
-url <- "https://developer.nrel.gov/api/alt-fuel-stations/v1.json?"
+library(magrittr)
+library(totalcensus)
+
+source('~/sfi_project/R/data_processing.R')
 
 state <- "NM"
+county <- 049
 
+osm_bbox <- "santa fe, new mexico"
+osm_tags <- c("motorway", "trunk", "primary", "secondary", "tertiary", "residential")
 
-# Get Stations from API ---------------------------------------------------
+# Import Data (RoadNet, Census, Stations) ---------------------------------
+streetnet_sf <- osmdata::opq(bbox = osm_bbox) %>% 
+  osmdata::add_osm_feature(key = "highway", value = osm_tags) %>% 
+  osmdata::osmdata_sf() %>% 
+  `[[`("osm_lines")
 
-response <- httr::GET(
-  url, 
-  query = list(
-    api_key = api_key, 
-    fuel_type = "ELEC",
-    state = state
-  )
+streetnet_graph <- streetnet_sf %>% 
+  dodgr::weight_streetnet(wt_profile = "motorcar") %>% 
+  dodgr::dodgr_contract_graph()
+
+streetnet_distances <- dodgr::dodgr_distances(streetnet_graph) %>% 
+  trim_disconnected_nodes()
+
+census_data_sf <- import_join_population_income_data(state, county, save_path = "data")
+
+stations_sf <- get_charging_stations(state) %>% 
+  sf::st_crop(osmdata::getbb(osm_bbox, format_out = "sf_polygon")) %>% 
+  sf::st_transform(sf::st_crs(census_data_sf))
+
+# Join StreetNet/Census Data ----------------------------------------------
+
+nodes_census_sf <- join_nodes_with_census_data(
+  streetnet_graph, 
+  streetnet_distances, 
+  census_data_sf
 )
 
-content <- httr::content(response)
+# Assign Stations to StreetNet Nodes --------------------------------------
 
-
-# Convert to Spatial Object -----------------------------------------------
-
-longitudes <- content$fuel_stations %>% 
-  purrr::map_dbl("longitude")
-
-latitudes <- content$fuel_stations %>% 
-  purrr::map_dbl("latitude")
-
-stations_sf <- data.frame(x = longitudes, y = latitudes) %>% 
-  sf::st_as_sf(coords = c("x", "y"), crs = 4326)
+assignments <- assign_stations_nearest_nodes(nodes_census_sf, stations_sf)
