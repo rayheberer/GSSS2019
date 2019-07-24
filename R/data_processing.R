@@ -28,6 +28,7 @@ join_nodes_with_census_data <- function(graph, distances, census_data_sf) {
     
   covered_by <- sf::st_covered_by(nodes, census_data_sf) %>% 
     tibble::as_tibble() %>% 
+    dplyr::distinct(row.id, .keep_all = TRUE) %>% 
     dplyr::transmute(id = nodes$id, GEOID = census_data_sf$GEOID[col.id])
   
   population_flat <- tibble::as_tibble(census_data_sf) %>% 
