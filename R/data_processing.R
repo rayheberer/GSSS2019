@@ -38,3 +38,21 @@ get_nodes_with_census_data <- function(graph, census_data_sf, distances) {
     dplyr::left_join(nodes_in_polygon, by = "GEOID") %>% 
     dplyr::left_join(data.frame(population_flat), by = "GEOID")
 }
+
+get_charging_stations <- function(state) {
+  api_key <- Sys.getenv("NREL_API_KEY")
+  url <- "https://developer.nrel.gov/api/alt-fuel-stations/v1.json?"
+  
+  content <- url %>% 
+    httr::GET(query = list(api_key = api_key, fuel_type = "ELEC", state = state)) %>% 
+    httr::content()
+  
+  longitudes <- content$fuel_stations %>% 
+    purrr::map_dbl("longitude")
+  
+  latitudes <- content$fuel_stations %>% 
+    purrr::map_dbl("latitude")
+  
+  data.frame(x = longitudes, y = latitudes) %>% 
+    sf::st_as_sf(coords = c("x", "y"), crs = 4326)
+}
