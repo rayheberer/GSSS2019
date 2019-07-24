@@ -1,5 +1,6 @@
 library(magrittr)
 library(totalcensus)
+library(mapview)
 
 source('~/sfi_project/R/data_processing.R')
 
@@ -7,7 +8,12 @@ state <- "NM"
 county <- 049
 
 osm_bbox <- "santa fe, new mexico"
-osm_tags <- c("motorway", "trunk", "primary", "secondary", "tertiary", "residential")
+osm_tags <- c("motorway", "trunk", "primary", "secondary", 
+              "tertiary", "unclassified", "residential",
+              "motorway_link", "trunk_link", "primary_link",
+              "secondary_link", "tertiary_link", "living_street",
+              "service", "pedestrian", "track", "bus_guideway",
+              "escape", "raceway", "road")
 
 # Import Data (RoadNet, Census, Stations) ---------------------------------
 streetnet_sf <- osmdata::opq(bbox = osm_bbox) %>% 
@@ -39,3 +45,14 @@ nodes_census_sf <- join_nodes_with_census_data(
 # Assign Stations to StreetNet Nodes --------------------------------------
 
 assignments <- assign_stations_nearest_nodes(nodes_census_sf, stations_sf)
+
+assignments_sf <- nodes_census_sf %>% 
+  dplyr::filter(id %in% assignments)
+
+mapview(assignments_sf, color = "red") + 
+  mapview(stations_sf, color = "green") + 
+  mapview(nodes_census_sf)
+
+mapview(assignments_sf, color = "red") + 
+  mapview(stations_sf, color = "green") + 
+  mapview(streetnet_sf)
