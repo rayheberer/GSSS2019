@@ -13,3 +13,11 @@ mean_min_distance <- function(distances, placements, demands = NULL) {
   
   ifelse(mmd == 0, Inf, mmd)
 }
+
+maximal_distance <- function(distances, placements) {
+  distances_to_placements <- distances[, placements, drop = FALSE]
+  
+  max_distances <- apply(distances_to_placements, 1, max, na.rm = TRUE)
+  
+  max(max_distances)
+}
