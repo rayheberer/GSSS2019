@@ -4,7 +4,7 @@ random_placement <- function(distances, p = 1) {
 }
 
 greedy_placement <- function(distances, demands = NULL,
-                             objective_fn = mean_min_distance, p = 1) {
+                             objective_fn = mean_minimum_distance, p = 1) {
   
   nodes <- rownames(distances)
   available_nodes <- nodes
