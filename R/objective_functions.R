@@ -1,18 +1,16 @@
 maximal_distance <- function(distances, placements) {
   dist_indexed <- distances[, placements, drop = FALSE]
   
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
-  max(min_distances)
+  max(min_distances[is.finite(min_distances)], na.rm = TRUE)
 }
 
 minimal_distance <- function(distances, placements) {
-  assertthat::assert_that(sum(distances == 0) == nrow(distances))
-  
   dist_indexed <- distances[, placements, drop = FALSE]
   dist_indexed[dist_indexed == 0] <- Inf
   
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
   min(min_distances)
 }
@@ -24,7 +22,7 @@ range <- function(distances, placements) {
 mean_minimal_distance <- function(distances, placements, weights = NULL) {
   dist_indexed <- distances[, placements, drop = FALSE]
   
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
   denom <- nrow(distances)
   
@@ -39,7 +37,7 @@ mean_minimal_distance <- function(distances, placements, weights = NULL) {
 variance_minimal_distance <- function(distances, placements, weights = NULL) {
   dist_indexed <- distances[, placements, drop = FALSE]
   
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
   mean_min_distances <- mean_minimal_distance(distances, placements, weights)
   
@@ -51,12 +49,12 @@ variance_minimal_distance <- function(distances, placements, weights = NULL) {
     denom <- sum(weights) - 1
   }
   
-  sum(diffs) / denom
+  sum(diffs[is.finite(diffs)]) / denom
 }
 
 gini_coefficient <- function(distances, placements, weights) {
   dist_indexed <- distances[, placements, drop = FALSE]
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
   result <- 0
   for (i in 1:length(min_distances)) {
@@ -70,17 +68,17 @@ gini_coefficient <- function(distances, placements, weights) {
 
 mean_deviation <- function(distances, placements, weights) {
   dist_indexed <- distances[, placements, drop = FALSE]
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
   mean_min_distances <- mean_minimal_distance(distances, placements, weights)
   deviation <- weights * abs(min_distances - mean_min_distances)
   
-  sum(deviation) / sum(weights)
+  sum(deviation[is.finite(deviation)]) / sum(weights)
 }
 
 hoover_concentration_index <- function(distances, placements, weights) {
   dist_indexed <- distances[, placements, drop = FALSE]
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
   node_aggregate_travel <- min_distances * weights
   graph_aggregate_travel <- sum(node_aggregate_travel)
@@ -88,12 +86,12 @@ hoover_concentration_index <- function(distances, placements, weights) {
   
   diffs <- (node_aggregate_travel / graph_aggregate_travel) - (weights / total_weight)
   
-  sum(abs(diffs)) / 2
+  sum(abs(diffs[is.finite(diffs)])) / 2
 }
 
 moran_i <- function(distances, placements, weights, neighborhood_radius) {
   dist_indexed <- distances[, placements, drop = FALSE]
-  min_distances <- apply(dist_indexed, 1, min, na.rm = TRUE)
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
   mean_V <- mean_minimal_distance(distances, placements)
   
@@ -108,7 +106,7 @@ moran_i <- function(distances, placements, weights, neighborhood_radius) {
     }
   }
   
-  denom <- sum((min_distances - mean_V)^2)
+  denom <- sum((min_distances[is.finite(min_distances)] - mean_V)^2)
   
   (length(min_distances) / w_sum) * (num / denom)
 }
