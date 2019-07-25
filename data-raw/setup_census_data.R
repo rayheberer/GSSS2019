@@ -1,9 +1,11 @@
 library(magrittr)
+library(totalcensus)
 
 source('~/sfi_project/R/data_processing.R')
+totalcensus::set_path_to_census(tempdir())
 
-state <- "IL"
-county <- 031
+state <- "NM"
+county <- "049"
 
 # -------------------------------------------------------------------------
 

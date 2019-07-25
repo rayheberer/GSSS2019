@@ -58,9 +58,7 @@ get_charging_stations <- function(state, crs = 4326) {
     sf::st_as_sf(coords = c("x", "y"), crs = crs)
 }
 
-import_join_population_income_data <- function(state, county, save_path = tempdir()) {
-  totalcensus::set_path_to_census(save_path)
-  
+import_join_population_income_data <- function(state, county) {
   population <- 
     totalcensus::read_decennial(
       year = 2010, 
