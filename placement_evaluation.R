@@ -16,6 +16,8 @@ osm_tags <- c("motorway", "trunk", "primary", "secondary",
               "service", "pedestrian", "track", "bus_guideway",
               "escape", "raceway", "road")
 
+random_placement_trials <- 100
+
 # Import Data (Streetnet, Census, Stations) -------------------------------
 
 streetnet_sf <- osmdata::opq(bbox = osm_bbox) %>% 
@@ -27,7 +29,7 @@ graph <- streetnet_sf %>%
   dodgr::weight_streetnet(wt_profile = "motorcar") %>% 
   dodgr::dodgr_contract_graph()
 
-distances <- dodgr::dodgr_distances(streetnet_graph) %>% 
+distances <- dodgr::dodgr_distances(graph) %>% 
   trim_disconnected_nodes()
 
 census_data_sf <- readRDS(file.path("data", paste0(state, county, "_censusdata.rds")))
@@ -39,23 +41,74 @@ stations_sf <- get_charging_stations(state) %>%
 # Join Data, Get Assignments ----------------------------------------------
 
 nodes_census_sf <- join_nodes_with_census_data(
-  streetnet_graph, 
-  streetnet_distances, 
+  graph, 
+  distances, 
   census_data_sf
 )
 
 placements <- assign_stations_nearest_nodes(nodes_census_sf, stations_sf)
 
-placements_sf <- nodes_census_sf %>% 
-  dplyr::filter(id %in% assignments)
-
 # Get Population & Demand Weights -----------------------------------------
 
+weights <- nodes_census_sf %>% 
+  dplyr::mutate(weights = population / num_nodes) %>% 
+  `[[`("weights") %>% 
+  `names<-`(nodes_census_sf$id)
 
-# Sample Performance Measures ---------------------------------------------
 
-maximal_distance(distances, placements)
+# Calculate Performance Measures ------------------------------------------
 
-minimal_distance(distances, placements)
+unweighted_performance_measures <- c("maximal_distance", "minimal_distance", 
+                                     "range", "mean_minimal_distance", 
+                                     "variance_minimal_distance")
 
-range(distances, placements)
+weighted_performance_measures <- c("mean_minimal_distance", "variance_minimal_distance",
+                                   "mean_deviation", "hoover_concentration_index",
+                                   "theil_entropy_index")#,
+                                   #"gini_coefficient", "moran_i")
+
+results <- NULL
+for (fn in unweighted_performance_measures) {
+  message(fn)
+  results <- c(results, do.call(fn, list(distances, placements)))
+}
+
+for (fn in weighted_performance_measures) {
+  message(fn)
+  results <- c(results, do.call(fn, list(distances, placements, weights)))
+}
+
+names(results) <- c(unweighted_performance_measures, 
+                    paste0("weighted_", weighted_performance_measures))
+
+
+# Calculate Performance Measures - Random Placement -----------------------
+
+placements_random <- 1:random_placement_trials %>% 
+  purrr::map(~random_placement(distances, p = length(placements)))
+
+results_random <- list()
+for (fn in unweighted_performance_measures) {
+  message(fn)
+  results_random[[length(results_random) + 1]] <- placements_random %>% 
+    purrr::map_dbl(~do.call(fn, list(distances, .)))
+}
+
+for (fn in weighted_performance_measures) {
+  message(fn)
+  results_random[[length(results_random) + 1]] <- placements_random %>% 
+    purrr::map_dbl(~do.call(fn, list(distances, ., weights)))
+}
+
+names(results_random) <- names(results)
+
+results_random <- tibble::as_tibble(results_random)
+
+results_random_summary <- results_random %>% 
+  dplyr::summarize_all(list(mean = mean, sd = sd))
+
+plots <- list()
+for (col in names(results_random)) {
+  plots[[length(plots) + 1]] <- ggplot(results_random[col], aes(x = !!col)) +
+    geom_density()
+}
