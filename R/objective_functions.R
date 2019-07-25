@@ -99,6 +99,10 @@ moran_i <- function(distances, placements, weights, neighborhood_radius) {
   w_sum <- 0
   for (i in 1:length(min_distances)) {
     for (j in 1:length(min_distances)) {
+      if (is.na(distances[i, j])) {
+        next
+      }
+      
       if (distances[i, j] < neighborhood_radius) {
         num <- num + ((min_distances[i] - mean_V) * (min_distances[j] - mean_V))
         w_sum <- w_sum + 1
