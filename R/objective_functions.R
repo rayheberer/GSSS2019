@@ -56,6 +56,9 @@ gini_coefficient <- function(distances, placements, weights) {
   dist_indexed <- distances[, placements, drop = FALSE]
   min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
+  weights <- weights[is.finite(min_distances)]
+  min_distances <- min_distances[is.finite(min_distances)]
+  
   result <- 0
   for (i in 1:length(min_distances)) {
     for (j in 1:length(min_distances)) {
@@ -93,10 +96,14 @@ moran_i <- function(distances, placements, weights, neighborhood_radius) {
   dist_indexed <- distances[, placements, drop = FALSE]
   min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
+  weights <- weights[is.finite(min_distances)]
+  min_distances <- min_distances[is.finite(min_distances)]
+  
   mean_V <- mean_minimal_distance(distances, placements)
   
   num <- 0
   w_sum <- 0
+  
   for (i in 1:length(min_distances)) {
     for (j in 1:length(min_distances)) {
       if (is.na(distances[i, j])) {
@@ -110,7 +117,24 @@ moran_i <- function(distances, placements, weights, neighborhood_radius) {
     }
   }
   
-  denom <- sum((min_distances[is.finite(min_distances)] - mean_V)^2)
+  denom <- sum((min_distances - mean_V)^2)
   
   (length(min_distances) / w_sum) * (num / denom)
 }
+
+theil_entropy_index <- function(distances, placements, weights) {
+  dist_indexed <- distances[, placements, drop = FALSE]
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
+  
+  weights <- weights[is.finite(min_distances) & min_distances > 0]
+  min_distances <- min_distances[is.finite(min_distances) & min_distances > 0]
+  
+  node_aggregate_travel <- min_distances * weights
+  graph_aggregate_travel <- sum(node_aggregate_travel)
+  
+  entropy <- (min_distances / graph_aggregate_travel) * 
+    log(min_distances / graph_aggregate_travel)
+  
+  log(length(min_distances)) + sum(weights * entropy)
+}
+
