@@ -64,8 +64,7 @@ unweighted_performance_measures <- c("maximal_distance", "minimal_distance",
 
 weighted_performance_measures <- c("mean_minimal_distance", "variance_minimal_distance",
                                    "mean_deviation", "hoover_concentration_index",
-                                   "theil_entropy_index")#,
-                                   #"gini_coefficient", "moran_i")
+                                   "theil_entropy_index")
 
 results <- NULL
 for (fn in unweighted_performance_measures) {
@@ -81,6 +80,10 @@ for (fn in weighted_performance_measures) {
 names(results) <- c(unweighted_performance_measures, 
                     paste0("weighted_", weighted_performance_measures))
 
+results["gini_coefficiet"] <- gini_coefficient_vectorized(distances, placements, weights)
+results["moran_I"] <- moran_i_vectorized(distances, placements, weights, 100)
+
+saveRDS(results, file.path("results", paste0(state, county, "_metrics.rds")))
 
 # Calculate Performance Measures - Random Placement -----------------------
 
@@ -100,15 +103,45 @@ for (fn in weighted_performance_measures) {
     purrr::map_dbl(~do.call(fn, list(distances, ., weights)))
 }
 
-names(results_random) <- names(results)
+names(results_random) <- c(unweighted_performance_measures, 
+                           paste0("weighted_", weighted_performance_measures))
+
+results_random[["gini_coefficient"]] <- placements_random %>% 
+  purrr::map_dbl(~gini_coefficient_vectorized(distances, ., weights))
+
+results_random[["moran_I"]] <- placements_random %>% 
+  purrr::map_dbl(~moran_i_vectorized(distances, ., weights, 100))
 
 results_random <- tibble::as_tibble(results_random)
+
+write.csv(results_random, file.path("results", "results_random.csv"))
 
 results_random_summary <- results_random %>% 
   dplyr::summarize_all(list(mean = mean, sd = sd))
 
-plots <- list()
-for (col in names(results_random)) {
-  plots[[length(plots) + 1]] <- ggplot(results_random[col], aes(x = !!col)) +
-    geom_density()
+
+# Calculate Performance Measures - Greedy Placement -----------------------
+
+placements_greedy <- greedy_placement(distances, weights, p = length(placements))
+
+results_greedy <- NULL
+for (fn in unweighted_performance_measures) {
+  message(fn)
+  results_greedy <- c(results_greedy, do.call(fn, list(distances, placements_greedy)))
 }
+
+for (fn in weighted_performance_measures) {
+  message(fn)
+  results_greedy <- 
+    c(results_greedy, do.call(fn, list(distances, placements_greedy, weights)))
+}
+
+names(results_greedy) <- c(unweighted_performance_measures, 
+                           paste0("weighted_", weighted_performance_measures))
+
+results_greedy["gini_coefficient"] <- 
+  gini_coefficient_vectorized(distances, placements_greedy, weights)
+
+results_greedy["moran_I"] <- moran_i_vectorized(distances, placements_greedy, weights, 100)
+
+saveRDS(results_greedy, file.path("results", paste0(state, county, "_greedymetrics.rds")))
