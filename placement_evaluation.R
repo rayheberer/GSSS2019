@@ -90,6 +90,8 @@ saveRDS(results, file.path("results", paste0(state, county, "_metrics.rds")))
 placements_random <- 1:random_placement_trials %>% 
   purrr::map(~random_placement(distances, p = length(placements)))
 
+saveRDS(placements_random, file.path("results", "placements_random.rds"))
+
 results_random <- list()
 for (fn in unweighted_performance_measures) {
   message(fn)
@@ -122,7 +124,9 @@ results_random_summary <- results_random %>%
 
 # Calculate Performance Measures - Greedy Placement -----------------------
 
-placements_greedy <- greedy_placement(distances, weights, p = length(placements))
+placements_greedy <- greedy_placement_vectorized(distances, weights, p = length(placements))
+
+saveRDS(placements_greedy, file.path("results", "placements_weighted_greedy.rds"))
 
 results_greedy <- NULL
 for (fn in unweighted_performance_measures) {
