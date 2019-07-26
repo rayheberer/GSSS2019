@@ -35,9 +35,13 @@ variance_minimal_distance(distances, placements, weights) # 19.83
 
 gini_coefficient(distances, placements, weights) # 0.413
 
+gini_coefficient_vectorized(distances, placements, weights) # 0.413
+
 mean_deviation(distances, placements, weights) # 4.07
 
 hoover_concentration_index(distances, placements, weights) # 0.347
+
+moran_i(distances, placements, weights, 10) # 0.26
 
 moran_i(distances, placements, weights, 10) # 0.26
 

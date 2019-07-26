@@ -96,7 +96,6 @@ moran_i <- function(distances, placements, weights, neighborhood_radius) {
   dist_indexed <- distances[, placements, drop = FALSE]
   min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
   
-  weights <- weights[is.finite(min_distances)]
   min_distances <- min_distances[is.finite(min_distances)]
   
   mean_V <- mean_minimal_distance(distances, placements)
@@ -138,3 +137,37 @@ theil_entropy_index <- function(distances, placements, weights) {
   log(length(min_distances)) + sum(weights * entropy)
 }
 
+gini_coefficient_vectorized <- function(distances, placements, weights) {
+  dist_indexed <- distances[, placements, drop = FALSE]
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
+  
+  weights <- weights[is.finite(min_distances)]
+  min_distances <- min_distances[is.finite(min_distances)]
+  
+  min_distance_matrix <- as.matrix(dist(min_distances))
+  weights_X <- matrix(rep(weights, length(weights)), nrow = length(weights))
+  
+  num <- sum(min_distance_matrix * weights_X * t(weights_X))
+  
+  num / (2 * sum(weights)^2 * mean_minimal_distance(distances, placements))
+}
+
+moran_i_vectorized <- function(distances, placements, weights, neighborhood_radius) {
+  dist_indexed <- distances[, placements, drop = FALSE]
+  min_distances <- suppressWarnings(apply(dist_indexed, 1, min, na.rm = TRUE))
+  
+  weight_matrix <- 
+    distances[is.finite(min_distances), is.finite(min_distances)] < neighborhood_radius
+  
+  weight_matrix[is.na(weight_matrix)] <- 0
+
+  min_distances <- min_distances[is.finite(min_distances)]
+  
+  mean_V <- mean_minimal_distance(distances, placements)
+  
+  diffs_X <- matrix(rep(min_distances - mean_V, length(min_distances)), 
+                    nrow = length(min_distances))
+  
+  (length(min_distances) / sum(weight_matrix)) * 
+    (sum(weight_matrix * diffs_X * t(diffs_X)) / sum((min_distances - mean_V)^2))
+}
