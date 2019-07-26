@@ -98,3 +98,8 @@ assign_stations_nearest_nodes <- function(nodes_sf, stations_sf,
   
   nodes_sf[[node_id_col]][station_rows]
 }
+
+clear_tempdir <- function() {
+  list.files(tempdir(), full.names = TRUE) %>% 
+    unlink(recursive = TRUE)
+}
