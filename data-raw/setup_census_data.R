@@ -1,7 +1,7 @@
 library(magrittr)
 library(totalcensus)
 
-source('~/sfi_project/R/data_processing.R')
+source(here::here('R/data_processing.R'))
 totalcensus::set_path_to_census(tempdir())
 
 state <- "MA"

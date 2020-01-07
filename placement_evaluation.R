@@ -1,9 +1,9 @@
 library(magrittr)
 
-source('~/sfi_project/R/data_processing.R')
-source('~/sfi_project/R/objective_functions.R')
-source('~/sfi_project/R/placement_algorithms.R')
-source('~/sfi_project/R/simulations_and_sampling.R')
+source(here::here('R/data_processing.R'))
+source(here::here('R/objective_functions.R'))
+source(here::here('R/placement_algorithms.R'))
+source(here::here('R/simulations_and_sampling.R'))
 
 state <- "NM"
 county <- "049"
