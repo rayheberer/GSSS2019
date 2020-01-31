@@ -15,9 +15,8 @@ trim_disconnected_nodes <- function(distances) {
   distances
 }
 
-join_nodes_with_census_data <- function(graph, distances, census_data_sf) {
+join_nodes_with_census_data <- function(graph, census_data_sf) {
   nodes <- dodgr::dodgr_vertices(graph) %>% 
-    dplyr::filter(id %in% rownames(distances)) %>% 
     sf::st_as_sf(coords = c("x", "y"), crs = sf::st_crs(census_data_sf))
   
   covers <- sf::st_covers(census_data_sf, nodes)
@@ -102,4 +101,24 @@ assign_stations_nearest_nodes <- function(nodes_sf, stations_sf,
 clear_tempdir <- function() {
   list.files(tempdir(), full.names = TRUE) %>% 
     unlink(recursive = TRUE)
+}
+
+build_distance_mat <- function(grid_centers, otp_con) {
+  distance_mat <- matrix(nrow = nrow(grid_centers), ncol = nrow(grid_centers))
+  
+  pb <- progress::progress_bar$new(total = nrow(grid_centers))
+  
+  for (i in seq_len(nrow(grid_centers))) {
+    for (j in seq_len(nrow(grid_centers))) {
+      if (i == j) {
+        next()
+      }
+      try(suppressMessages(suppressWarnings(invisible(
+        distance_mat[i, j] <- opentripplanner::otp_plan(otp_con, grid_centers[i,], grid_centers[j,], mode = "CAR")$distance,
+      ))), silent = TRUE)
+    }
+    pb$tick()
+  }
+  
+  distance_mat
 }
