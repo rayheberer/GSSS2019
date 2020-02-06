@@ -1,5 +1,7 @@
 library(magrittr)
 
+source(here::here("R/data_processing.R"))
+
 state <- "GA"
 county <- "121"
 osm_bbox <- "atlanta, georgia"
@@ -33,7 +35,9 @@ boundary_points <- data.frame(x = bbox_lon, y = bbox_lat) %>%
 # Lay Down Grid -----------------------------------------------------------
 
 grid <- boundary_points %>% 
-  sf::st_make_grid(cellsize = grid_res)
+  sf::st_make_grid(cellsize = grid_res) %>% 
+  sf::st_as_sf() %>% 
+  dplyr::mutate(id = as.character(dplyr::row_number()))
 
 grid_centers <- sf::st_centroid(grid) %>% 
   sf::st_as_sf() %>% 
@@ -44,9 +48,21 @@ grid_centers <- sf::st_centroid(grid) %>%
 setwd(otp_dir)
 opentripplanner::otp_setup("otp.jar", ".", router = otp_router, memory = otp_memory)
 
-otp_con <- opentripplanner::otp_connect()
+otp_con <- opentripplanner::otp_connect(router = otp_router)
 
-distances <- build_distance_mat(grid_centers, otp_con)
+valid_nodes <- get_valid_nodes(grid_centers, otp_con)
+
+# saveRDS(valid_nodes, "~/Documents/R/GSSS2019/data/valid_nodes_georgia_500m.rds")
+# valid_nodes <- readRDS("~/Documents/R/GSSS2019/data/valid_nodes_georgia_500m.rds")
+
+routing_df <- get_routing_df(grid_centers, otp_con, valid_nodes[1:10], get_geometry = FALSE, ncores = 3)
+
+distances <- routing_df %>% 
+  dplyr::select(fromPlace, toPlace, distance) %>% 
+  dplyr::mutate_all(as.numeric) %>% 
+  dplyr::arrange(toPlace) %>% 
+  tidyr::pivot_wider(names_from = toPlace, values_from = distance) %>% 
+  dplyr::arrange(fromPlace)
 
 # Weight Grid -------------------------------------------------------------
 

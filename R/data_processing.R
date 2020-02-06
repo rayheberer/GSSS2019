@@ -1,3 +1,5 @@
+library(magrittr)
+
 trim_disconnected_nodes <- function(distances) {
   trimmed <- FALSE
   
@@ -103,22 +105,55 @@ clear_tempdir <- function() {
     unlink(recursive = TRUE)
 }
 
-build_distance_mat <- function(grid_centers, otp_con) {
-  distance_mat <- matrix(nrow = nrow(grid_centers), ncol = nrow(grid_centers))
-  
-  pb <- progress::progress_bar$new(total = nrow(grid_centers))
-  
+get_valid_nodes <- function(grid_centers, otp_con, test_node = 1) {
+  bad_nodes <- numeric(0)
   for (i in seq_len(nrow(grid_centers))) {
-    for (j in seq_len(nrow(grid_centers))) {
-      if (i == j) {
-        next()
-      }
-      try(suppressMessages(suppressWarnings(invisible(
-        distance_mat[i, j] <- opentripplanner::otp_plan(otp_con, grid_centers[i,], grid_centers[j,], mode = "CAR")$distance,
-      ))), silent = TRUE)
+    if (i == test_node) {
+      next()
     }
-    pb$tick()
+    
+    plan <- opentripplanner::otp_plan(otp_con, grid_centers[test_node, 'x'], grid_centers[i, 'x'], get_geometry = FALSE)
+    if (is.na(plan)) {
+      bad_nodes <- append(bad_nodes, i)
+    }
   }
   
-  distance_mat
+  setdiff(1:nrow(grid_centers), bad_nodes)
+}
+
+get_routing_df <- function(grid_centers, otp_con, valid_nodes = NULL, batch_size = 10000, ...) {
+  
+  if (is.null(valid_nodes)) {
+    message("testing for bad nodes...")
+    valid_nodes <- get_valid_nodes(grid_centers, otp_con)
+  }
+
+  message("calculating origin-destination pairs...")
+  od_pairs <- purrr::cross2(valid_nodes, valid_nodes, .filter = `==`)
+  origins <- purrr::map_dbl(od_pairs, 1)
+  destinations <- purrr::map_dbl(od_pairs, 2)
+  
+  assertthat::assert_that(!any(origins == destinations))
+  
+  message("routing...")
+  
+  origin_batches <- split(origins, ceiling(seq_along(origins) / batch_size))
+  destination_batches <- split(destinations, ceiling(seq_along(destinations) / batch_size))
+  
+  routing_df <- NULL
+  for (i in seq_along(origin_batches)) {
+    routing_df <- dplyr::bind_rows(
+      routing_df,
+      opentripplanner::otp_plan(
+        otp_con,
+        fromPlace = grid_centers[origin_batches[[i]], 'x'],
+        toPlace = grid_centers[destination_batches[[i]], 'x'], 
+        fromID = grid_centers$id[origin_batches[[i]]],
+        toID = grid_centers$id[destination_batches[[i]]],
+        ...
+      )
+    )
+  }
+  
+  routing_df
 }
