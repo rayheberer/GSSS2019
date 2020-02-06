@@ -66,8 +66,25 @@ distances <- routing_df %>%
 
 # Weight Grid -------------------------------------------------------------
 
+census_data_sf <- readRDS(file.path(data_path, paste0(state, county, "_censusdata.rds"))) %>% 
+  sf::st_transform(sf::st_crs(grid_centers))
+
+nodes <- grid_centers %>% 
+  dplyr::filter(id %in% names(distances))
+
+nodes_census_sf <- join_nodes_with_census_data(
+  nodes, 
+  census_data_sf
+)
+
 
 # Assign Placements -------------------------------------------------------
+
+stations_sf <- get_charging_stations(state) %>% 
+  sf::st_crop(osmdata::getbb(osm_bbox, format_out = "sf_polygon")) %>% 
+  sf::st_transform(sf::st_crs(grid_centers))
+
+placements <- assign_stations_nearest_nodes(nodes_census_sf, stations_sf)
 
 
 # Evaluate Placements -----------------------------------------------------

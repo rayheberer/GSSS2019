@@ -17,10 +17,8 @@ trim_disconnected_nodes <- function(distances) {
   distances
 }
 
-join_nodes_with_census_data <- function(graph, census_data_sf) {
-  nodes <- dodgr::dodgr_vertices(graph) %>% 
-    sf::st_as_sf(coords = c("x", "y"), crs = sf::st_crs(census_data_sf))
-  
+join_nodes_with_census_data <- function(nodes, census_data_sf) {
+
   covers <- sf::st_covers(census_data_sf, nodes)
   names(covers) <- census_data_sf$GEOID
   
