@@ -57,37 +57,6 @@ get_charging_stations <- function(state, crs = 4326) {
     sf::st_as_sf(coords = c("x", "y"), crs = crs)
 }
 
-import_join_population_income_data <- function(state, county) {
-  population <- 
-    totalcensus::read_decennial(
-      year = 2010, 
-      states = state, 
-      summary_level = "block group", 
-    ) %>% 
-    dplyr::mutate(GEOID = stringr::str_sub(GEOID, 8L)) %>% 
-    dplyr::select(GEOID, population)
-  
-  income <- tidycensus::get_acs("tract", "B19013_001", state = state, county = county) %>% 
-    dplyr::select(GEOID, income = estimate, income_moe = moe)
-  
-  tracts_sf <- tigris::tracts(state, county) %>% 
-    sf::st_as_sf()
-  
-  block_groups_sf <- tigris::block_groups(state, county) %>% 
-    sf::st_as_sf()
-  
-  income_tracts <- tracts_sf %>% 
-    dplyr::left_join(income, by = "GEOID") %>% 
-    tibble::as_tibble() %>% 
-    dplyr::select(-geometry, -GEOID)
-  
-  block_groups_sf %>% 
-    dplyr::left_join(population, by = "GEOID") %>% 
-    dplyr::left_join(income_tracts, by = "TRACTCE") %>% 
-    dplyr::select(GEOID, population, income, income_moe) %>% 
-    dplyr::mutate(area = sf::st_area(geometry), density = population / area)
-}
-
 assign_stations_nearest_nodes <- function(nodes_sf, stations_sf,
                                           node_id_col = "id") {
   
