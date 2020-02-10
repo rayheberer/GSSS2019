@@ -1,19 +1,17 @@
 library(magrittr)
 
 source(here::here("R/data_processing.R"))
+source(here::here("R/objective_functions.R"))
 
 state <- "GA"
 county <- "121"
 osm_bbox <- "atlanta, georgia"
 utm_epsg <- 32616
 
-grid_res <- 500
-
-otp_dir <- "~/Documents/otp"
-otp_router <- "georgia"
-otp_memory <- 10240
+grid_res <- 250
 
 data_path <- here::here("data")
+routing_df_batches_path <- file.path(data_path, glue::glue("routing_df_batches_{state}{grid_res}"))
 
 
 # Get Boundary Polygon ----------------------------------------------------
@@ -45,20 +43,9 @@ grid_centers <- sf::st_centroid(grid) %>%
 
 # Get Distance Matrix through Routing Engine ------------------------------
 
-setwd(otp_dir)
-opentripplanner::otp_setup("otp.jar", ".", router = otp_router, memory = otp_memory)
-
-otp_con <- opentripplanner::otp_connect(router = otp_router)
-
-valid_nodes <- get_valid_nodes(grid_centers, otp_con)
-
-# saveRDS(valid_nodes, "~/Documents/R/GSSS2019/data/valid_nodes_georgia_500m.rds")
-# valid_nodes <- readRDS("~/Documents/R/GSSS2019/data/valid_nodes_georgia_500m.rds")
-
-routing_df <- get_routing_df(grid_centers, otp_con, valid_nodes[1:10], get_geometry = FALSE, ncores = 3)
+routing_df <- import_bind_routing_df_batches(routing_df_batches_path)
 
 distances <- routing_df %>% 
-  dplyr::select(fromPlace, toPlace, distance) %>% 
   dplyr::mutate_all(as.numeric) %>% 
   dplyr::arrange(toPlace) %>% 
   tidyr::pivot_wider(names_from = toPlace, values_from = distance) %>% 
@@ -66,7 +53,7 @@ distances <- routing_df %>%
 
 # Weight Grid -------------------------------------------------------------
 
-census_data_sf <- readRDS(file.path(data_path, paste0(state, county, "_censusdata.rds"))) %>% 
+census_data_sf <- readRDS(file.path(data_path, paste0(state, "_censusdata.rds"))) %>% 
   sf::st_transform(sf::st_crs(grid_centers))
 
 nodes <- grid_centers %>% 
@@ -77,6 +64,16 @@ nodes_census_sf <- join_nodes_with_census_data(
   census_data_sf
 )
 
+# TODO: figure out why GEOIDs have multiple incomes, aggregate or deduplicate as needed
+
+nodes_census_sf <- nodes_census_sf %>% 
+  dplyr::distinct(GEOID, .keep_all = TRUE)
+
+weights <- nodes_census_sf %>% 
+  dplyr::mutate(weights = population / num_nodes) %>% 
+  dplyr::pull(weights) %>% 
+  setNames(nodes_census_sf$id)
+
 
 # Assign Placements -------------------------------------------------------
 
@@ -84,7 +81,8 @@ stations_sf <- get_charging_stations(state) %>%
   sf::st_crop(osmdata::getbb(osm_bbox, format_out = "sf_polygon")) %>% 
   sf::st_transform(sf::st_crs(grid_centers))
 
-placements <- assign_stations_nearest_nodes(nodes_census_sf, stations_sf)
+placements <- assign_stations_nearest_nodes(nodes_census_sf, stations_sf)  
+# TODO: aggregate somehow when multiple stations assigned to the same node
 
 
 # Evaluate Placements -----------------------------------------------------

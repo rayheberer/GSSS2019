@@ -72,55 +72,13 @@ clear_tempdir <- function() {
     unlink(recursive = TRUE)
 }
 
-get_valid_nodes <- function(grid_centers, otp_con, test_node = 1) {
-  bad_nodes <- numeric(0)
-  for (i in seq_len(nrow(grid_centers))) {
-    if (i == test_node) {
-      next()
-    }
-    
-    plan <- opentripplanner::otp_plan(otp_con, grid_centers[test_node, 'x'], grid_centers[i, 'x'], get_geometry = FALSE)
-    if (is.na(plan)) {
-      bad_nodes <- append(bad_nodes, i)
-    }
-  }
+import_bind_routing_df_batches <- function(batch_dir) {
+  batch_files <- list.files(batch_dir, full.names = TRUE)
   
-  setdiff(1:nrow(grid_centers), bad_nodes)
-}
 
-get_routing_df <- function(grid_centers, otp_con, valid_nodes = NULL, batch_size = 10000, ...) {
-  
-  if (is.null(valid_nodes)) {
-    message("testing for bad nodes...")
-    valid_nodes <- get_valid_nodes(grid_centers, otp_con)
-  }
-
-  message("calculating origin-destination pairs...")
-  od_pairs <- purrr::cross2(valid_nodes, valid_nodes, .filter = `==`)
-  origins <- purrr::map_dbl(od_pairs, 1)
-  destinations <- purrr::map_dbl(od_pairs, 2)
-  
-  assertthat::assert_that(!any(origins == destinations))
-  
-  message("routing...")
-  
-  origin_batches <- split(origins, ceiling(seq_along(origins) / batch_size))
-  destination_batches <- split(destinations, ceiling(seq_along(destinations) / batch_size))
-  
-  routing_df <- NULL
-  for (i in seq_along(origin_batches)) {
-    routing_df <- dplyr::bind_rows(
-      routing_df,
-      opentripplanner::otp_plan(
-        otp_con,
-        fromPlace = grid_centers[origin_batches[[i]], 'x'],
-        toPlace = grid_centers[destination_batches[[i]], 'x'], 
-        fromID = grid_centers$id[origin_batches[[i]]],
-        toID = grid_centers$id[destination_batches[[i]]],
-        ...
-      )
-    )
-  }
-  
-  routing_df
+  batch_files %>% 
+    purrr::map(readRDS) %>% 
+    purrr::map(tibble::as_tibble) %>% 
+    purrr::map(~dplyr::select(., fromPlace, toPlace, distance)) %>% 
+    dplyr::bind_rows()
 }
