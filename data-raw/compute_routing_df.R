@@ -13,7 +13,7 @@ otp_dir <- "~/Documents/otp"
 otp_router <- "georgia"
 otp_memory <- 10240
 test_node <- 1
-batch_size <- 100  # TODO: change to 10000
+batch_size <- 10000
 
 data_path <- here::here("data")
 batches_path <- file.path(data_path, paste0("routing_df_batches_", state, grid_res))
