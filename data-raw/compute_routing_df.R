@@ -13,7 +13,6 @@ otp_dir <- "~/Documents/otp"
 otp_router <- "georgia"
 otp_memory <- 10240
 test_node <- 1
-batch_size <- 10000
 
 data_path <- here::here("data")
 batches_path <- file.path(data_path, paste0("routing_df_batches_", state, grid_res))
@@ -78,32 +77,30 @@ if (valid_nodes_rds %in% list.files(data_path)) {
   saveRDS(valid_nodes, file.path(data_path, valid_nodes_rds))
 }
 
-message("calculating origin-destination pairs...")
-od_pairs <- purrr::cross2(valid_nodes, valid_nodes, .filter = `==`)
-origins <- purrr::map_dbl(od_pairs, 1)
-destinations <- purrr::map_dbl(od_pairs, 2)
-
-assertthat::assert_that(!any(origins == destinations))
-
 message("routing...")
 
-origin_batches <- split(origins, ceiling(seq_along(origins) / batch_size))
-destination_batches <- split(destinations, ceiling(seq_along(destinations) / batch_size))
+batch_size <- length(valid_nodes)
+offsets <- 1:(batch_size - 1)
 
-for (i in sample(seq_along(origin_batches), size = length(origin_batches))) {
-  batch_df_rds <- glue::glue("batch_{i}.rds")
+
+origins <- valid_nodes
+
+for (offset in offsets) {
+  batch_df_rds <- glue::glue("batch_{offset}.rds")
   
   if (batch_df_rds %in% list.files(batches_path)) {
     message("Batch already computed, skipping...")
     next()
   }
   
+  destinations <- c(valid_nodes[1 + offset:batch_size], valid_nodes[1:offset])
+  
   batch_df <- opentripplanner::otp_plan(
       otp_con,
-      fromPlace = grid_centers[origin_batches[[i]], 'x'],
-      toPlace = grid_centers[destination_batches[[i]], 'x'], 
-      fromID = grid_centers$id[origin_batches[[i]]],
-      toID = grid_centers$id[destination_batches[[i]]],
+      fromPlace = grid_centers[origins, 'x'],
+      toPlace = grid_centers[destinations, 'x'], 
+      fromID = grid_centers$id[origins],
+      toID = grid_centers$id[destinations],
   )
   
   saveRDS(batch_df, file.path(batches_path, batch_df_rds))
