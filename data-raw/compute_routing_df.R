@@ -52,10 +52,6 @@ grid_centers <- sf::st_centroid(grid) %>%
 
 setwd(otp_dir)
 
-tryCatch(
-  
-)
-
 opentripplanner::otp_setup("otp.jar", ".", router = otp_router, memory = otp_memory)
 
 otp_con <- opentripplanner::otp_connect(router = otp_router)
