@@ -94,7 +94,7 @@ offsets <- 1:(batch_size - 1)
 
 origins <- valid_nodes
 
-for (offset in offsets) {
+for (offset in sample(offsets, size = length(offsets))) {
   batch_df_rds <- glue::glue("batch_{offset}.rds")
   
   if (batch_df_rds %in% list.files(batches_path)) {
