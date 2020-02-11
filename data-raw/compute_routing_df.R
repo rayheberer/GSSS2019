@@ -13,6 +13,8 @@ otp_dir <- "~/Documents/otp"
 otp_router <- "georgia"
 otp_memory <- 10240
 test_node <- 1
+otp_port <- 8082
+
 
 data_path <- here::here("data")
 batches_path <- file.path(data_path, paste0("routing_df_batches_", state, grid_res))
@@ -47,13 +49,17 @@ grid_centers <- sf::st_centroid(grid) %>%
   sf::st_transform(crs = 4326)
 
 
-# Compute Routing Df ------------------------------------------------------
+
+# Setup Router ------------------------------------------------------------
+
 
 setwd(otp_dir)
 
-opentripplanner::otp_setup("otp.jar", ".", router = otp_router, memory = otp_memory)
+opentripplanner::otp_setup("otp.jar", ".", router = otp_router, memory = otp_memory, port = otp_port, securePort = otp_port + 1)
+otp_con <- opentripplanner::otp_connect(router = otp_router, port = otp_port)
 
-otp_con <- opentripplanner::otp_connect(router = otp_router)
+# Get Valid Nodes ---------------------------------------------------------
+
 
 valid_nodes_rds <- paste0("valid_nodes_", state, grid_res, "m.rds")
 
@@ -77,6 +83,9 @@ if (valid_nodes_rds %in% list.files(data_path)) {
   saveRDS(valid_nodes, file.path(data_path, valid_nodes_rds))
 }
 
+
+# Compute Batches ---------------------------------------------------------
+
 message("routing...")
 
 batch_size <- length(valid_nodes)
@@ -93,7 +102,7 @@ for (offset in offsets) {
     next()
   }
   
-  destinations <- c(valid_nodes[1 + offset:batch_size], valid_nodes[1:offset])
+  destinations <- c(valid_nodes[(1 + offset):batch_size], valid_nodes[1:offset])
   
   batch_df <- opentripplanner::otp_plan(
       otp_con,
