@@ -82,7 +82,8 @@ sample_origin_lons <- ifelse(is_loop, sample_lons, runif(survey_rows, lon_min, l
 sample_origin_lats <- ifelse(is_loop, sample_lats, runif(survey_rows, lat_min, lat_max))
 
 survey_raw <- survey_raw %>% 
-  dplyr::mutate(lon = sample_lons, lat = sample_lats, origin_lon = sample_origin_lons, origin_lat = sample_origin_lats)
+  dplyr::mutate(lon = sample_lons, lat = sample_lats, origin_lon = sample_origin_lons, origin_lat = sample_origin_lats) %>% 
+  dplyr::sample_n(1000)
 
 # Filter for Non-Loop Trips above Minumum Distance ------------------------
 
@@ -94,8 +95,16 @@ survey_filtered_sf <- survey_raw %>%
 
 # Distribute Demand into Time/Space Buckets -------------------------------
 
-survey_binned <- NULL
+cell_ids <- sf::st_nearest_feature(survey_filtered_sf, grid_centers)
 
+survey_space_binned <- survey_filtered_sf %>% 
+  dplyr::mutate(grid_cell_id = cell_ids) %>% 
+  tibble::as_tibble() %>% 
+  dplyr::select(-c(origin_lon, origin_lat, geometry))
+
+survey_time_binned <- survey_space_binned %>% 
+  dplyr::mutate(arr_hour = lubridate::hour(arr_time), dep_hour = lubridate::hour(dep_time)) %>% 
+  dplyr::select(-c(arr_time, dep_time))
 
 # Export Data -------------------------------------------------------------
 
