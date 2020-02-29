@@ -9,17 +9,17 @@ utm_epsg <- 32616
 
 grid_res <- 250
 
-otp_dir <- "~/Documents/otp"
-otp_router <- "georgia"
-otp_memory <- 10240
-test_node <- 1
-otp_port <- 8082
-
+batch_size <- 50
 
 data_path <- here::here("data")
-batches_path <- file.path(data_path, paste0("routing_df_batches_", state, grid_res))
 
-dir.create(batches_path, showWarnings = FALSE)
+routing_batch_path <- file.path(data_path, glue::glue("routing-batches-{state}"))
+dir.create(routing_batch_path, showWarnings = FALSE)
+
+valhalla_path <- here::here(glue::glue("valhalla-{state}"))
+if (!valhalla_path %in% list.files(here::here(), full.names = TRUE)) {
+  source(here::here("setup_valhalla.R"))
+}
 
 # Get Boundary Polygon ----------------------------------------------------
 
@@ -48,74 +48,61 @@ grid_centers <- sf::st_centroid(grid) %>%
   sf::st_as_sf() %>% 
   sf::st_transform(crs = 4326)
 
+lat_lons <- do.call(rbind, sf::st_geometry(grid_centers)) %>% 
+  tibble::as_tibble(.name_repair = "minimal") %>% 
+  setNames(c("lon", "lat")) %>% 
+  dplyr::select(lat, lon)
 
+ids <- grid_centers$id
 
 # Setup Router ------------------------------------------------------------
 
-
-setwd(otp_dir)
-
-opentripplanner::otp_setup("otp.jar", ".", router = otp_router, memory = otp_memory, port = otp_port, securePort = otp_port + 1)
-otp_con <- opentripplanner::otp_connect(router = otp_router, port = otp_port)
-
-# Get Valid Nodes ---------------------------------------------------------
+setwd(valhalla_path)
+system("docker-compose up", wait = FALSE)
+Sys.sleep(10)  # a bit of a hacky way to ensure the router is set up
 
 
-valid_nodes_rds <- paste0("valid_nodes_", state, grid_res, "m.rds")
+# Build Routing Batches ---------------------------------------------------
 
-if (valid_nodes_rds %in% list.files(data_path)) {
-  valid_nodes <- readRDS(file.path(data_path, valid_nodes_rds))
-} else {
-  message("Computing valid nodes...")
-  bad_nodes <- numeric(0)
-  for (i in seq_len(nrow(grid_centers))) {
-    if (i == test_node) {
-      next()
-    }
+null_to_na <- function(x) {
+  x[vapply(x, is.null, logical(1))] <- NA
+  return(x)
+}
+
+batches <- split(1:nrow(lat_lons), ceiling(seq_len(nrow(lat_lons)) / batch_size))
+
+for (batch_ix in 1:length(batches)) {
+  source_ix <- batches[[batch_ix]]
+  sources <- jsonlite::toJSON(lat_lons[source_ix,])
+  source_ids <- ids[source_ix]
+  
+  batch_df <- NULL
+  for (target_ix in batches) {
+    targets <- jsonlite::toJSON(lat_lons[target_ix,])
+    target_ids <- ids[target_ix]
+
+    query <- glue::glue('curl http://localhost:8002/sources_to_targets --data \'{"sources": {{sources}}, 
+                        "targets": {{targets}}, "costing": "auto"}\' | jq \'.\'', .open = "{{", .close = "}}")
     
-    plan <- opentripplanner::otp_plan(otp_con, grid_centers[test_node, 'x'], grid_centers[i, 'x'], get_geometry = FALSE)
-    if (is.na(plan)) {
-      bad_nodes <- append(bad_nodes, i)
-    }
+    response <- system(query, intern = TRUE) %>% 
+      jsonlite::parse_json()
+    
+    sources_to_targets <- response$sources_to_targets %>% 
+      purrr::flatten()
+    
+    batch_routing_mat <- do.call(rbind, sources_to_targets) %>% 
+      null_to_na()
+    
+    routing_df <- tibble::tibble(
+      from_id = source_ids[unlist(batch_routing_mat[, "from_index"]) + 1],
+      to_id = target_ids[unlist(batch_routing_mat[, "to_index"]) + 1],
+      distance = unlist(batch_routing_mat[, "distance"]),
+      time = unlist(batch_routing_mat[, "time"])
+    )
+    
+    batch_df <- dplyr::bind_rows(batch_df, routing_df)
   }
   
-  valid_nodes <- setdiff(1:nrow(grid_centers), bad_nodes)
-  saveRDS(valid_nodes, file.path(data_path, valid_nodes_rds))
-}
-
-
-# Compute Batches ---------------------------------------------------------
-
-message("routing...")
-
-batch_size <- length(valid_nodes)
-offsets <- 1:(batch_size - 1)
-
-
-origins <- valid_nodes
-
-for (offset in sample(offsets, size = length(offsets))) {
-  batch_df_rds <- glue::glue("batch_{offset}.rds")
-  
-  if (batch_df_rds %in% list.files(batches_path)) {
-    message("Batch already computed, skipping...")
-    next()
-  }
-  
-  destinations <- c(valid_nodes[(1 + offset):batch_size], valid_nodes[1:offset])
-  
-  batch_df <- opentripplanner::otp_plan(
-      otp_con,
-      fromPlace = grid_centers[origins, 'x'],
-      toPlace = grid_centers[destinations, 'x'], 
-      fromID = grid_centers$id[origins],
-      toID = grid_centers$id[destinations],
-  )
-  
-  saveRDS(batch_df, file.path(batches_path, batch_df_rds))
+  saveRDS(batch_df, file.path(routing_batch_path, glue::glue("batch_{batch_ix}.rds")))
   
 }
-
-# Cleanup -----------------------------------------------------------------
-
-rm(list = ls())
