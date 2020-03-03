@@ -74,11 +74,10 @@ clear_tempdir <- function() {
 
 import_bind_routing_df_batches <- function(batch_dir) {
   batch_files <- list.files(batch_dir, full.names = TRUE)
-  
 
   batch_files %>% 
     purrr::map(readRDS) %>% 
     purrr::map(tibble::as_tibble) %>% 
-    purrr::map(~dplyr::select(., fromPlace, toPlace, distance)) %>% 
+    purrr::map(~dplyr::select(., from_id, to_id, distance)) %>% 
     dplyr::bind_rows()
 }

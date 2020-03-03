@@ -11,8 +11,7 @@ utm_epsg <- 32616
 grid_res <- 250
 
 data_path <- here::here("data")
-routing_df_batches_path <- file.path(data_path, glue::glue("routing_df_batches_{state}{grid_res}"))
-
+routing_batch_path <- file.path(data_path, glue::glue("routing-batches-{state}"))
 
 # Get Boundary Polygon ----------------------------------------------------
 
@@ -43,13 +42,13 @@ grid_centers <- sf::st_centroid(grid) %>%
 
 # Get Distance Matrix through Routing Engine ------------------------------
 
-routing_df <- import_bind_routing_df_batches(routing_df_batches_path)
+routing_df <- import_bind_routing_df_batches(routing_batch_path)
 
 distances <- routing_df %>% 
   dplyr::mutate_all(as.numeric) %>% 
-  dplyr::arrange(toPlace) %>% 
-  tidyr::pivot_wider(names_from = toPlace, values_from = distance) %>% 
-  dplyr::arrange(fromPlace)
+  dplyr::arrange(to_id) %>% 
+  tidyr::pivot_wider(names_from = to_id, values_from = distance) %>% 
+  dplyr::arrange(from_id)
 
 # Weight Grid -------------------------------------------------------------
 

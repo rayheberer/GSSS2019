@@ -9,7 +9,7 @@ utm_epsg <- 32616
 
 grid_res <- 250
 
-batch_size <- 50
+batch_size <- 1000
 
 data_path <- here::here("data")
 
@@ -71,13 +71,19 @@ null_to_na <- function(x) {
 
 batches <- split(1:nrow(lat_lons), ceiling(seq_len(nrow(lat_lons)) / batch_size))
 
-for (batch_ix in 1:length(batches)) {
-  source_ix <- batches[[batch_ix]]
+for (source_batch in 1:length(batches)) {
+  source_ix <- batches[[source_batch]]
   sources <- jsonlite::toJSON(lat_lons[source_ix,])
   source_ids <- ids[source_ix]
   
-  batch_df <- NULL
-  for (target_ix in batches) {
+  for (target_batch in 1:length(batches)) {
+    name <- glue::glue("batch_{source_batch}_{target_batch}.rds")
+    if (name %in% list.files(routing_batch_path)) {
+      message("Batch already processed, skipping...")
+      next()
+    }
+    
+    target_ix <- batches[[target_batch]]
     targets <- jsonlite::toJSON(lat_lons[target_ix,])
     target_ids <- ids[target_ix]
 
@@ -100,9 +106,6 @@ for (batch_ix in 1:length(batches)) {
       time = unlist(batch_routing_mat[, "time"])
     )
     
-    batch_df <- dplyr::bind_rows(batch_df, routing_df)
+    saveRDS(routing_df, file.path(routing_batch_path, name))
   }
-  
-  saveRDS(batch_df, file.path(routing_batch_path, glue::glue("batch_{batch_ix}.rds")))
-  
 }
