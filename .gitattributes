@@ -1,3 +1,4 @@
 data/routing_df_full.rds filter=lfs diff=lfs merge=lfs -text
 data/grid_centers.rds filter=lfs diff=lfs merge=lfs -text
 data/valid_nodes_GA250m.rds filter=lfs diff=lfs merge=lfs -text
+data/GA_censusdata.rds filter=lfs diff=lfs merge=lfs -text
